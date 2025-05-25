@@ -52,7 +52,7 @@ def analyze(filenames):
         analysis_tools.analyze_data(filename)
 
 def help():
-    print 'auto.py -r -f <parameterFile> -a\nUsing the option -a to analyze, requires -f to be set'
+    print('auto.py -r -f <parameterFile> -a\nUsing the option -a to analyze, requires -f to be set')
 
 def main(argv):
 

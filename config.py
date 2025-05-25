@@ -3,7 +3,7 @@
 ##########################################
 
 # File path of the LTspice program installed on the system
-LTSpice_executable_path = 'C:\Program Files (x86)\LTC\LTspiceIV\scad3.exe'
+LTSpice_executable_path = '/home/leo/.wine/drive_c/Program Files/LTC/LTspiceXVII/XVIIx64.exe'
 # The name of the circuit to be used in simulations
 LTSpice_asc_filename = 'example_circuit.asc'
 

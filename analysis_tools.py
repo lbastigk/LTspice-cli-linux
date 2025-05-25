@@ -73,8 +73,8 @@ def analyze_data(file_path):
         if fall_found:
             fall_time_voltage = (time[fall_v[0]], time[fall_v[1]])
         else:
-            print time[fall_v[0]]
-            print time[fall_v[1]]
+            print(time[fall_v[0]])
+            print(time[fall_v[1]])
             fall_time_voltage = (0,0)
 
         # Find current switching times
@@ -217,7 +217,7 @@ def calculate_switching_times(data, nominal_value):
         return (rise, fall, True, True) # Return
     except UnboundLocalError:
         # Some value not found
-        print 'Error: unable to find rise or fall time. Zero is returned.'
+        print('Error: unable to find rise or fall time. Zero is returned.')
         return ((0,0), (0,0), False, False)
 
 def calc_switch_loss(time, voltage, current):

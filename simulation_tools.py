@@ -3,8 +3,9 @@ import os
 from tempfile import mkstemp
 from shutil import move
 import numpy as np
-
+import subprocess
 import config
+import shutil
 
 
 # ----------- Simulation controls ----------- #
@@ -34,9 +35,9 @@ def run_simulations(parameter_set=None, numerical_name_start=0):
             if config.output_data_naming_convention == 'number':
                 file_num = str(i + numerical_name_start)
                 output_name = '0'*(3-len(file_num)) + file_num
-                output_path = config.output_data_path + output_name + '.txt'
+                output_path = config.output_data_path + output_name
             else:
-                output_path = config.output_data_path + parameter + '=' + str(parameter_value) + '.txt'
+                output_path = config.output_data_path + parameter + '=' + str(parameter_value)
             output_filenames.append(output_path)
             set_parameters(file_path + '.asc', parameter, parameter_value)
             print('Starting simulation with the specified parameter: ' + parameter + '=' + str(parameter_value))
@@ -44,39 +45,83 @@ def run_simulations(parameter_set=None, numerical_name_start=0):
             simulate(spice_exe_path, file_path_generated)
             # Set header and cleanup the file
             output_header = 'SPICE simulation result. Parameters: ' + ', '.join(get_parameters(file_path_generated + '.asc')) + '\n' # Maybe not add the time variables
-            clean_raw_file(spice_exe_path, file_path_generated, output_path, output_header)
+            #clean_raw_file(spice_exe_path, file_path_generated, output_path, output_header)
+            move_raw_file(file_path, output_path)
+
     else:
         # Run a simulation with the preset values of the file
-        output_path = config.output_data_path + 'result.txt'
+        output_path = config.output_data_path + 'result'
         print('Starting simulation.')
         simulate(spice_exe_path, file_path)
         # Set header and cleanup the file
         output_header = 'SPICE simulation result. Parameters: ' + ', '.join(get_parameters(file_path + '.asc')) + '\n' # Maybe not add the time variables
-        clean_raw_file(spice_exe_path, file_path, output_path, output_header)
+        #clean_raw_file(spice_exe_path, file_path, output_path, output_header)
+        move_raw_file(file_path, output_path)
+
 
     # Return the list with names of the output filenames
     return output_filenames
 
+
+def to_windows_path(unix_path):
+    result = subprocess.run(['winepath', '-w', unix_path], capture_output=True, text=True)
+    return result.stdout.strip()
+
+
 def simulate(spice_exe_path, file_path):
-    file_name = str(file_path.split('\\')[-1])
-    print('Simulation starting: ' + file_name + '.asc')
-    call('"' + spice_exe_path + '" -netlist "' + file_path + '.asc"')
-    call('"' + spice_exe_path + '" -b -ascii "' + file_path + '.net"')
-    size = os.path.getsize(file_path + '.raw')
-    print('Simulation finished: ' + file_name + '.raw created (' + str(size/1000) + ' kB)')
+    # Convert Unix paths to Windows-style paths for Wine
+    wine_spice_path = to_windows_path(spice_exe_path)
+    wine_base_path = to_windows_path(file_path)
+
+    file_name = os.path.basename(file_path)
+    print(f'Simulation starting: {file_name}.asc')
+
+    # Append extensions to Wine-compatible base path
+    asc_file = wine_base_path + '.asc'
+    net_file = wine_base_path + '.net'
+    raw_file_unix = file_path + '.raw'  # raw_file is checked on Unix filesystem
+
+    print("Running command:", ['wine', wine_spice_path, '-netlist', asc_file])
+    subprocess.call(['wine', wine_spice_path, '-netlist', asc_file])
+    subprocess.call(['wine', wine_spice_path, '-b', '-ascii', net_file])
+
+    if os.path.exists(raw_file_unix):
+        size = os.path.getsize(raw_file_unix)
+        print(f'Simulation finished: {file_name}.raw created ({size / 1000:.1f} kB)')
+    else:
+        print('Error: .raw file not created. Simulation may have failed.')
+
+def move_raw_file(source_path, target_path):
+    """
+    Move the .raw file from source_path to target_path.
+    Automatically appends '.raw' if not included in paths.
+    """
+    if not source_path.endswith('.raw'):
+        source_path += '.raw'
+    if not target_path.endswith('.raw'):
+        target_path += '.raw'
+
+    try:
+        shutil.move(source_path, target_path)
+        print(f'Raw file saved to: {target_path}')
+    except FileNotFoundError:
+        print(f'Error: Raw file not found at {source_path}')
+    except Exception as e:
+        print(f'Error moving raw file: {e}')
+
 
 def clean_raw_file(spice_exe_path, file_path, output_path, output_header):
 
     # Try to open the requested file
     file_name = file_path
     try:
-        f = open(file_path + '.raw', 'r')
+        f = open(file_path + '.raw', 'r', encoding='latin1')
     except IOError:
         # If the requested raw file is not found, simulations will be run,
         # assuming a that a corresponding LTspice schematic exists
         print('File not found: ' + file_name + '.raw')
         simulate(spice_exe_path, file_path)
-        f = open(file_path + '.raw', 'r')
+        f = open(file_path + '.raw', 'r', encoding='latin1')
 
     print('Cleaning up file: ' + file_name + '.raw')
 
@@ -159,8 +204,8 @@ def parse_parameter_file(filename):
 
 def set_parameters(file_path, param, param_val, overwrite=False):
     f, abs_path = mkstemp()
-    with open(abs_path,'w') as new_file:
-        with open(file_path) as old_file:
+    with open(abs_path, 'w') as new_file:
+        with open(file_path, encoding='latin1') as old_file:  # add encoding here
             for line in old_file:
                 line_list = line.split(' ')
                 if line_list[0] == 'TEXT':
@@ -179,12 +224,13 @@ def set_parameters(file_path, param, param_val, overwrite=False):
     else:
         move(abs_path, file_path[:-4] + '_generated.asc')
 
+
 def get_parameters(file_path):
     output_list = []
-    f = open(file_path, 'r')
-    for line in f:
-        line_list = line.split()
-        if line_list[0] == 'TEXT' and '!.param' in line_list:
-            output_list.extend(line_list[line_list.index('!.param') + 1:])
-    f.close()
+    with open(file_path, 'r', encoding='latin1') as f:
+        for line in f:
+            line_list = line.split()
+            if line_list[0] == 'TEXT' and '!.param' in line_list:
+                output_list.extend(line_list[line_list.index('!.param') + 1:])
     return output_list
+
