@@ -1,5 +1,9 @@
 # LTspice-cli
 
+This fork from the LTspice-cli by joskvi offers compatibility with linux by using wine. 
+Many functionalities arent working for now, such as special characters in the LTSpice files.
+This is just a minimal example.
+
 ## About
 
 LTspice-cli is a command line tool, which enables running simulations in LTspice from the command line. It also has the ability to specify a file containing the circuit parameters which the simulations should be run with. LTspice-cli is written in Python 2.7, and requires NumPy to run. The tool is only tested with LTspice IV.
